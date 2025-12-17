@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Start – Rekenoefeningen</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#f4f6ff;margin:0;min-height:100vh;display:flex;justify-content:center;align-items:center}
+    .box{background:#fff;padding:2.2rem 2.4rem;border-radius:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.1);max-width:640px;width:95%}
+    h1{margin:0 0 .6rem}
+    .sub{color:#555;margin:0 0 1.2rem}
+    .panel{background:#f7f8ff;border:1px solid #e6e8ff;border-radius:1rem;padding:1rem;margin:.8rem 0}
+    .row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+    input{font-size:1rem;padding:.6rem .8rem;border-radius:.8rem;border:2px solid #ccc;outline:none;flex:1;min-width:220px}
+    input:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+    button{padding:.75rem 1.1rem;border:none;border-radius:999px;background:#4f46e5;color:#fff;font-weight:900;cursor:pointer}
+    button.secondary{background:#0f172a}
+    .small{font-size:.85rem;color:#666;margin-top:.4rem}
+    .msg{margin-top:.6rem;font-weight:800}
+    code{background:#eef2ff;padding:.15rem .35rem;border-radius:.4rem}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Start</h1>
+    <p class="sub">Vul je naam/code in. (Optioneel: plak je code uit MOO om je niveau mee te nemen.)</p>
+
+    <div class="panel">
+      <div class="row">
+        <input id="studentId" placeholder="Naam/code (bijv. sem4 of lisa-4b)">
+        <button id="goBtn">Verder</button>
+      </div>
+      <div class="small">Tip: maak de code uniek (bijv. <code>sem4</code> i.p.v. alleen <code>sem</code>).</div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <input id="transferCode" placeholder="(Optioneel) Plak hier je MOO-code om niveau te laden">
+        <button id="loadBtn" class="secondary">Laad</button>
+      </div>
+      <div class="small">Plak de code die je eerder kreeg en klik <b>Laad</b>. Daarna klik je <b>Verder</b>.</div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </div>
+
+<script>
+  const STORAGE_CURRENT = "rekenen_current_student_v1";
+  const STORAGE_DATA_PREFIX = "rekenen_data_v1_"; // per leerling
+
+  const $ = (id) => document.getElementById(id);
+  const cleanId = (s)=> (s||"").trim().toLowerCase().replace(/\s+/g,"");
+
+  // simpele checksum / base64 helpers
+  function checksum(str){ let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0; return h.toString(36); }
+  function b64decode(str){ return decodeURIComponent(escape(atob(str))); }
+
+  function dataKey(id){ return STORAGE_DATA_PREFIX + id; }
+
+  function ensureStudentData(id){
+    const existing = localStorage.getItem(dataKey(id));
+    if(existing) return;
+    // per onderdeel eigen level
+    const init = { v:1, id, levels: { plus:0, min:0, keer:0, deel:0 } };
+    localStorage.setItem(dataKey(id), JSON.stringify(init));
+  }
+
+  function loadTransferCode(){
+    const raw = ($("transferCode").value||"").trim();
+    if(!raw){ $("msg").textContent="Plak eerst een code."; return; }
+
+    const parts = raw.split(".");
+    if(parts.length!==2){ $("msg").textContent="Code klopt niet (formaat)."; return; }
+
+    try{
+      const json = b64decode(parts[0]);
+      if(checksum(json) !== parts[1]){ $("msg").textContent="Code klopt niet (controle)."; return; }
+      const payload = JSON.parse(json);
+      if(!payload || payload.v!==1 || typeof payload.id!=="string" || !payload.levels){ $("msg").textContent="Code klopt niet (inhoud)."; return; }
+
+      const id = cleanId(payload.id);
+      $("studentId").value = id;
+
+      localStorage.setItem(dataKey(id), JSON.stringify({ v:1, id, levels: payload.levels }));
+      $("msg").textContent = "Geladen! Klik nu op Verder.";
+    } catch(e){
+      $("msg").textContent="Kon code niet lezen.";
+    }
+  }
+
+  function goNext(){
+    const id = cleanId($("studentId").value);
+    if(!id){ $("msg").textContent="Vul eerst je naam/code in."; return; }
+    ensureStudentData(id);
+    localStorage.setItem(STORAGE_CURRENT, id);
+    location.href = "menu.html";
+  }
+
+  $("loadBtn").addEventListener("click", loadTransferCode);
+  $("goBtn").addEventListener("click", goNext);
+  $("studentId").addEventListener("keydown", (e)=>{ if(e.key==="Enter") goNext(); });
+
+  // als er al een leerling actief was
+  const prev = localStorage.getItem(STORAGE_CURRENT);
+  if(prev) $("studentId").value = prev;
+</script>
+</body>
+</html>
