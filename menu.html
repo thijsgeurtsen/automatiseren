@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Menu – Rekenoefeningen</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#f4f6ff;margin:0;min-height:100vh;display:flex;justify-content:center;align-items:center}
+    .box{background:#fff;padding:2.2rem 2.4rem;border-radius:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.1);max-width:640px;width:95%;text-align:center}
+    h1{margin:0 0 .6rem}
+    .sub{color:#555;margin:0 0 1.2rem}
+    .btn{display:block;margin:.7rem 0;padding:1rem 1.2rem;border-radius:999px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:900}
+    .btn.secondary{background:#6366f1}
+    .btn.accent{background:#16a34a}
+    .btn.dark{background:#0f172a}
+    .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+    a.small{color:#4f46e5;text-decoration:none;font-weight:800}
+    .pill{display:inline-block;padding:.35rem .7rem;border-radius:999px;background:#eef2ff;font-weight:900}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="top">
+      <a class="small" href="index.html">← Andere leerling</a>
+      <div class="pill" id="who">Leerling: —</div>
+    </div>
+
+    <h1>Kies wat je oefent</h1>
+    <p class="sub">Alles is adaptief: het niveau past zich aan per leerling.</p>
+
+    <a class="btn" href="plus.html">Optellen</a>
+    <a class="btn secondary" href="min.html">Aftrekken</a>
+    <a class="btn accent" href="keer.html">Keer</a>
+    <a class="btn dark" href="deel.html">Delen</a>
+  </div>
+
+<script>
+  const STORAGE_CURRENT = "rekenen_current_student_v1";
+  const id = localStorage.getItem(STORAGE_CURRENT) || "";
+  document.getElementById("who").textContent = id ? `Leerling: ${id}` : "Leerling: —";
+  if(!id){ location.href = "index.html"; }
+</script>
+</body>
+</html>
