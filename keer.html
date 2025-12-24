@@ -192,10 +192,11 @@ if(level===6) tables=[2,3,4,5,6,7,10];
 if(level===7) tables=[8,9];
 if(level===8) tables=[2,3,4,5,6,7,8,9,10];
 
-const a=pick(tables);
-const b=r(0,10);
-correct=a*b;
-qEl.textContent=`${a} × ${b}`;
+const tafel = pick(tables);
+const getal = r(0,10);
+correct = tafel * getal;
+qEl.textContent = `${getal} × ${tafel}`;
+
 }
 
 // ===== start =====
