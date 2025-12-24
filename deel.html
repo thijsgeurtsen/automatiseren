@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Delen – adaptief</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#f4f6ff;margin:0;min-height:100vh;display:flex;justify-content:center;align-items:center}
+    .box{background:#fff;padding:2.2rem 2.4rem;border-radius:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.1);max-width:780px;width:95%;text-align:center}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+    a.small{color:#4f46e5;text-decoration:none;font-weight:800}
+    .pill{display:inline-block;padding:.35rem .7rem;border-radius:999px;background:#eef2ff;font-weight:900}
+    h1{margin:.2rem 0 .2rem}
+    .sub{color:#555;margin:0 0 1rem}
+    .row{display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap;margin:1rem 0;font-weight:900}
+    .q{font-size:3rem;margin:1rem 0;min-height:3rem}
+    .q small{font-size:1.2rem;color:#666;font-weight:800}
+    input[type="number"]{font-size:1.6rem;padding:.5rem .9rem;width:240px;text-align:center;border-radius:.9rem;border:2px solid #ccc;outline:none}
+    input[type="text"]{font-size:1rem;padding:.55rem .8rem;border-radius:.8rem;border:2px solid #ccc;outline:none;flex:1;min-width:260px}
+    input:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+    button{padding:.8rem 1.3rem;border:none;border-radius:999px;background:#4f46e5;color:#fff;font-weight:900;cursor:pointer}
+    button.secondary{background:#0f172a}
+    button:disabled{background:#bbb;cursor:default}
+    .feedback{height:1.4rem;margin-top:.5rem;font-weight:900}
+    .good{color:#16a34a}.bad{color:#dc2626}
+    .result{margin-top:1rem;font-weight:900}
+    .panel{margin-top:1rem;background:#f7f8ff;border:1px solid #e6e8ff;border-radius:1rem;padding:1rem;text-align:left}
+    .panel .btnrow{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem;align-items:center}
+    .smalltxt{font-size:.85rem;color:#666}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="top">
+      <a class="small" href="menu.html">← Menu</a>
+      <div class="pill" id="who">—</div>
+    </div>
+
+    <h1>Delen</h1>
+    <p class="sub">Adaptief: niveau omhoog bij <b>24 of meer</b> goede antwoorden (2 minuten).</p>
+
+    <div class="row">
+      <div>⏱ <span id="time">2:00</span></div>
+      <div>✅ <span id="good">0</span></div>
+      <div>📊 <span id="tries">0</span></div>
+    </div>
+
+    <div class="pill" id="level">Niveau: —</div>
+
+    <div class="q" id="q">Druk op start</div>
+    <input id="ans" type="number" placeholder="antwoord" disabled>
+    <div id="fb" class="feedback"></div>
+
+    <div style="margin-top:1rem">
+      <button id="start">Start 2-minutentest</button>
+    </div>
+
+    <div id="res" class="result"></div>
+
+    <div class="panel">
+      <div><b>Code voor MOO (niveau meenemen)</b></div>
+      <div class="smalltxt">Klik <b>Maak code</b>, kopieer en plak in MOO. Op een andere Chromebook: plak en klik <b>Laad code</b>.</div>
+      <div class="btnrow">
+        <button id="make">Maak code</button>
+        <button id="load" class="secondary">Laad code</button>
+        <input id="code" placeholder="code..." />
+      </div>
+      <div class="smalltxt" id="msg"></div>
+    </div>
+  </div>
+
+<script>
+  // ===== opslag / leerling =====
+  const STORAGE_CURRENT = "rekenen_current_student_v1";
+  const STORAGE_DATA_PREFIX = "rekenen_data_v1_";
+
+  const id = localStorage.getItem(STORAGE_CURRENT) || "";
+  if(!id) location.href = "index.html";
+  document.getElementById("who").textContent = `Leerling: ${id}`;
+
+  function dataKey(id){ return STORAGE_DATA_PREFIX + id; }
+  function getData(){
+    const raw = localStorage.getItem(dataKey(id));
+    return raw ? JSON.parse(raw) : { v:1, id, levels:{plus:0,min:0,keer:0,deel:0} };
+  }
+  function setData(d){ localStorage.setItem(dataKey(id), JSON.stringify(d)); }
+
+  // ===== instellingen =====
+  const THRESHOLD = 24;
+  const SECONDS = 120;
+  const DOTS = "...";
+
+  const LEVELS = [
+    { name: "Niveau 1: deeltafel van 2" },
+    { name: "Niveau 2: deeltafel van 2 en 10" },
+    { name: "Niveau 3: deeltafel van 2, 5 en 10" },
+    { name: "Niveau 4: deeltafel van 3 en 4" },
+    { name: "Niveau 5: deeltafel van 2,3,4,5 en 10" },
+    { name: "Niveau 6: deeltafel van 6 en 7" },
+    { name: "Niveau 7: deeltafel van 2,3,4,5,6,7 en 10" },
+    { name: "Niveau 8: deeltafel van 8 en 9" },
+    { name: "Niveau 9: alle deeltafels" },
+    { name: "Niveau 10: stipsommen (56 : ... = 8)" },
+    { name: "Niveau 11: grotere deelsommen (450:5, 630:7)" },
+    { name: "Niveau 12: deeltafels t/m 100 (antwoord ≤ 20)" }
+  ];
+
+  // ===== UI =====
+  const timeEl = document.getElementById("time");
+  const goodEl = document.getElementById("good");
+  const triesEl = document.getElementById("tries");
+  const levelEl = document.getElementById("level");
+  const qEl = document.getElementById("q");
+  const ansEl = document.getElementById("ans");
+  const fbEl = document.getElementById("fb");
+  const resEl = document.getElementById("res");
+  const startBtn = document.getElementById("start");
+
+  // ===== state =====
+  let timer=null, t=SECONDS, good=0, tries=0, correct=0, active=false;
+
+  function fmt(s){ return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
+  function r(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+  function pick(arr){ return arr[r(0, arr.length-1)]; }
+
+  function getLevelIndex(){
+    const d = getData();
+    const n = d.levels?.deel ?? 0;
+    return Math.min(Math.max(0, n), LEVELS.length-1);
+  }
+  function setLevelIndex(n){
+    const d = getData();
+    d.levels = d.levels || {plus:0,min:0,keer:0,deel:0};
+    d.levels.deel = Math.min(Math.max(0, n), LEVELS.length-1);
+    setData(d);
+    renderLevel();
+  }
+  function renderLevel(){
+    const i = getLevelIndex();
+    levelEl.textContent = `Niveau: ${LEVELS[i].name}`;
+  }
+
+  function tablesForLevel(level){
+    switch(level){
+      case 0: return [2];
+      case 1: return [2,10];
+      case 2: return [2,5,10];
+      case 3: return [3,4];
+      case 4: return [2,3,4,5,10];
+      case 5: return [6,7];
+      case 6: return [2,3,4,5,6,7,10];
+      case 7: return [8,9];
+      case 8: return [2,3,4,5,6,7,8,9,10];
+      default: return [2,3,4,5,6,7,8,9,10];
+    }
+  }
+
+  function tryLoop(makeFn, okFn){
+    for(let k=0;k<500;k++){
+      const v = makeFn();
+      if(okFn(v)) return v;
+    }
+    return makeFn();
+  }
+
+  // Vraagtypes:
+  // normal: dividend : divisor = ? (antwoord is quotient)
+  // dots:   dividend : ... = quotient (antwoord is divisor)
+  function makeQuestionForLevel(level){
+    // Niveau 10 (index 9): stipsommen 56 : ... = 8
+    if(level === 9){
+      const tables = [2,3,4,5,6,7,8,9,10];
+      const divisor = pick(tables);
+      const quotient = r(0,10);
+      const dividend = divisor * quotient;
+      return {
+        html: `${dividend} : ${DOTS} = ${quotient}<br><small>Wat hoort op de puntjes?</small>`,
+        answer: divisor
+      };
+    }
+
+    // Niveau 11 (index 10): grotere deelsommen zoals 450:5, 630:7
+    // maak: (tafelgetal 2..10) × (tiental 10..90) => dividend; : tafelgetal
+    if(level === 10){
+      const divisor = pick([2,3,4,5,6,7,8,9,10]);
+      const qTens = pick([10,20,30,40,50,60,70,80,90]);
+      const dividend = divisor * qTens; // bijv 5*90=450
+      return { html: `${dividend} : ${divisor} = ?`, answer: qTens };
+    }
+
+    // Niveau 12 (index 11): deeltafels t/m 100, antwoord <= 20
+    // dividend = divisor * quotient, met dividend <= 100 en quotient <= 20
+    if(level === 11){
+      const divisor = pick([2,3,4,5,6,7,8,9,10]);
+      const quotient = r(0,20);
+      const dividend = divisor * quotient;
+
+      // zorg dat het binnen de voorwaarden blijft: dividend <= 100
+      const p = tryLoop(
+        ()=> {
+          const d = pick([2,3,4,5,6,7,8,9,10]);
+          const q = r(0,20);
+          return {divisor:d, quotient:q, dividend:d*q};
+        },
+        (x)=> x.dividend <= 100
+      );
+
+      return { html: `${p.dividend} : ${p.divisor} = ?`, answer: p.quotient };
+    }
+
+    // Niveau 1..9: deeltafels (quotient 0..10) met gekozen tafels
+    const tables = tablesForLevel(level);
+    const divisor = pick(tables);
+    const quotient = r(0,10);
+    const dividend = divisor * quotient;
+    return { html: `${dividend} : ${divisor} = ?`, answer: quotient };
+  }
+
+  function newQ(){
+    const i = getLevelIndex();
+    const q = makeQuestionForLevel(i);
+    correct = q.answer;
+    qEl.innerHTML = q.html;
+    ansEl.value = "";
+    ansEl.focus();
+  }
+
+  function start(){
+    if(active) return;
+    active=true; good=0; tries=0; t=SECONDS;
+
+    goodEl.textContent="0";
+    triesEl.textContent="0";
+    fbEl.textContent="";
+    fbEl.className="feedback";
+    resEl.textContent="";
+
+    ansEl.disabled=false;
+    startBtn.disabled=true;
+
+    renderLevel();
+    newQ();
+    timeEl.textContent = fmt(t);
+
+    clearInterval(timer);
+    timer=setInterval(()=>{
+      t--;
+      timeEl.textContent=fmt(t);
+      if(t<=0) end();
+    },1000);
+  }
+
+  function end(){
+    clearInterval(timer);
+    active=false;
+    ansEl.disabled=true;
+    startBtn.disabled=false;
+
+    const pct = Math.round((good/tries)*100) || 0;
+    let msg = `Je had ${good} goed van ${tries} pogingen. (${pct}%)`;
+
+    const i = getLevelIndex();
+    if(good >= THRESHOLD && i < LEVELS.length-1){
+      setLevelIndex(i+1);
+      msg += " 🎉 Niveau omhoog!";
+    } else {
+      msg += ` (Huidig niveau: ${LEVELS[i].name})`;
+    }
+    resEl.textContent = msg;
+    renderLevel();
+  }
+
+  ansEl.addEventListener("keydown",(e)=>{
+    if(e.key!=="Enter" || !active) return;
+    if(ansEl.value==="") return;
+
+    tries++;
+    triesEl.textContent=String(tries);
+
+    if(Number(ansEl.value)===correct){
+      good++;
+      goodEl.textContent=String(good);
+      fbEl.textContent="Goed!";
+      fbEl.className="feedback good";
+    } else {
+      fbEl.textContent=`Helaas, het was ${correct}.`;
+      fbEl.className="feedback bad";
+    }
+    newQ();
+  });
+
+  startBtn.addEventListener("click", start);
+
+  // init
+  renderLevel();
+  timeEl.textContent = fmt(SECONDS);
+
+  // ===== MOO export/import =====
+  const codeEl = document.getElementById("code");
+  const msgEl = document.getElementById("msg");
+
+  function checksum(str){ let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0; return h.toString(36); }
+  function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
+  function b64decode(str){ return decodeURIComponent(escape(atob(str))); }
+
+  document.getElementById("make").addEventListener("click", ()=>{
+    const d = getData();
+    const payload = { v:1, id:d.id, levels:d.levels };
+    const json = JSON.stringify(payload);
+    const packed = b64encode(json) + "." + checksum(json);
+    codeEl.value = packed;
+    codeEl.select();
+    try{ document.execCommand("copy"); }catch(e){}
+    msgEl.textContent = "Code gemaakt (vaak al gekopieerd). Plak in MOO.";
+  });
+
+  document.getElementById("load").addEventListener("click", ()=>{
+    const raw = (codeEl.value||"").trim();
+    if(!raw){ msgEl.textContent="Plak eerst een code."; return; }
+
+    const parts = raw.split(".");
+    if(parts.length!==2){ msgEl.textContent="Code klopt niet (formaat)."; return; }
+
+    try{
+      const json = b64decode(parts[0]);
+      if(checksum(json)!==parts[1]){ msgEl.textContent="Code klopt niet (controle)."; return; }
+
+      const payload = JSON.parse(json);
+      if(!payload || payload.v!==1 || payload.id!==id || !payload.levels){
+        msgEl.textContent="Code is niet voor deze leerling.";
+        return;
+      }
+
+      setData({ v:1, id, levels: payload.levels });
+      renderLevel();
+      msgEl.textContent = "Geladen!";
+    } catch(e){
+      msgEl.textContent="Kon code niet lezen.";
+    }
+  });
+</script>
+</body>
+</html>
