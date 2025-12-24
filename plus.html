@@ -2,10 +2,10 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8" />
-  <title>Optellen – adaptief</title>
+  <title>Optellen – adaptief (stipsommen)</title>
   <style>
     body{font-family:system-ui,sans-serif;background:#f4f6ff;margin:0;min-height:100vh;display:flex;justify-content:center;align-items:center}
-    .box{background:#fff;padding:2.2rem 2.4rem;border-radius:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.1);max-width:720px;width:95%;text-align:center}
+    .box{background:#fff;padding:2.2rem 2.4rem;border-radius:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.1);max-width:760px;width:95%;text-align:center}
     .top{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
     a.small{color:#4f46e5;text-decoration:none;font-weight:800}
     .pill{display:inline-block;padding:.35rem .7rem;border-radius:999px;background:#eef2ff;font-weight:900}
@@ -13,7 +13,8 @@
     .sub{color:#555;margin:0 0 1rem}
     .row{display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap;margin:1rem 0;font-weight:900}
     .q{font-size:3rem;margin:1rem 0;min-height:3rem}
-    input[type="number"]{font-size:1.6rem;padding:.5rem .9rem;width:220px;text-align:center;border-radius:.9rem;border:2px solid #ccc;outline:none}
+    .q small{font-size:1.2rem;color:#666;font-weight:800}
+    input[type="number"]{font-size:1.6rem;padding:.5rem .9rem;width:240px;text-align:center;border-radius:.9rem;border:2px solid #ccc;outline:none}
     input[type="text"]{font-size:1rem;padding:.55rem .8rem;border-radius:.8rem;border:2px solid #ccc;outline:none;flex:1;min-width:260px}
     input:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15)}
     button{padding:.8rem 1.3rem;border:none;border-radius:999px;background:#4f46e5;color:#fff;font-weight:900;cursor:pointer}
@@ -25,7 +26,6 @@
     .panel{margin-top:1rem;background:#f7f8ff;border:1px solid #e6e8ff;border-radius:1rem;padding:1rem;text-align:left}
     .panel .btnrow{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem;align-items:center}
     .smalltxt{font-size:.85rem;color:#666}
-    code{background:#eef2ff;padding:.15rem .35rem;border-radius:.4rem}
   </style>
 </head>
 <body>
@@ -69,7 +69,7 @@
   </div>
 
 <script>
-  // ===== Basis opslag (zelfde als jouw menu/start) =====
+  // ===== opslag / leerling =====
   const STORAGE_CURRENT = "rekenen_current_student_v1";
   const STORAGE_DATA_PREFIX = "rekenen_data_v1_";
 
@@ -84,21 +84,24 @@
   }
   function setData(d){ localStorage.setItem(dataKey(id), JSON.stringify(d)); }
 
-  // ===== JOUW 9 niveaus =====
-  const LEVELS = [
-    { name: "Niveau 1: optellen t/m 10" },
-    { name: "Niveau 2: tussen 10 en 20 (14 + 3)" },
-    { name: "Niveau 3: t/m 20 met overschrijding (8 + 5)" },
-    { name: "Niveau 4: t/m 100 – tientallen (40 + 20)" },
-    { name: "Niveau 5: tientallen bij tiental+eenheid (43 + 20)" },
-    { name: "Niveau 6: eenheden bij tiental zonder overschrijding (43 + 3)" },
-    { name: "Niveau 7: eenheden met overschrijding (58 + 6)" },
-    { name: "Niveau 8: tient+eenh bij tient+eenh zonder overschrijding (42 + 14)" },
-    { name: "Niveau 9: tient+eenh bij tient+eenh met overschrijding (48 + 24)" },
-  ];
-
+  // ===== instellingen =====
   const THRESHOLD = 24;
   const SECONDS = 120;
+
+  const LEVELS = [
+    { name: "Niveau 1: optellen t/m 10" },
+    { name: "Niveau 2: stipsommen t/m 10" },
+    { name: "Niveau 3: tussen 10 en 20 (14 + 3)" },
+    { name: "Niveau 4: stipsommen (vriendjes van 10)" },
+    { name: "Niveau 5: t/m 20 met overschrijding (8 + 5)" },
+    { name: "Niveau 6: stipsommen t/m 20" },
+    { name: "Niveau 7: t/m 100 – tientallen (40 + 20)" },
+    { name: "Niveau 8: tientallen bij tiental+eenheid (43 + 20)" },
+    { name: "Niveau 9: eenheden zonder overschrijding (43 + 3)" },
+    { name: "Niveau 10: eenheden met overschrijding (58 + 6)" },
+    { name: "Niveau 11: tient+eenh zonder overschrijding (42 + 14)" },
+    { name: "Niveau 12: tient+eenh met overschrijding (48 + 24)" },
+  ];
 
   // ===== UI =====
   const timeEl = document.getElementById("time");
@@ -111,7 +114,7 @@
   const resEl = document.getElementById("res");
   const startBtn = document.getElementById("start");
 
-  // ===== State =====
+  // ===== state =====
   let timer=null, t=SECONDS, good=0, tries=0, correct=0, active=false;
 
   function fmt(s){ return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
@@ -134,109 +137,154 @@
     levelEl.textContent = `Niveau: ${LEVELS[i].name}`;
   }
 
-  // ===== Som-generator per niveau (met jouw regels) =====
-  function makeQuestionForLevel(level){
-    let a=0, b=0;
-
-    // helper: probeer meerdere keren een geldige som te vinden
-    function tryLoop(makeFn, okFn){
-      for(let k=0;k<200;k++){
-        const pair = makeFn();
-        if(okFn(pair[0], pair[1])) return pair;
-      }
-      // fallback (zou praktisch nooit gebeuren)
-      return [5,5];
+  function tryLoop(makeFn, okFn){
+    for(let k=0;k<300;k++){
+      const v = makeFn();
+      if(okFn(v)) return v;
     }
+    return makeFn();
+  }
+
+  // Stipsom weergave: altijd "..."
+  function dotsPlaceholder(){
+    return "...";
+  }
+
+  function makeQuestionForLevel(level){
+    let a=0,b=0,target=0,miss=0;
 
     switch(level){
 
-      // 1) t/m 10
-      case 0:
-        [a,b] = tryLoop(
-          ()=>[r(0,10), r(0,10)],
-          (x,y)=> x+y <= 10
+      // 1) optellen t/m 10
+      case 0: {
+        const p = tryLoop(
+          ()=>({a:r(0,10), b:r(0,10)}),
+          (x)=> x.a + x.b <= 10
         );
-        break;
+        a=p.a; b=p.b;
+        return { html: `${a} + ${b} = ?`, answer: a+b };
+      }
 
-      // 2) tussen 10 en 20 (bijv 14+3) => som 11..20, eerste getal 10..19, tweede 1..?
-      case 1:
-        [a,b] = tryLoop(
-          ()=>[r(10,19), r(1,10)],
-          (x,y)=> (x+y >= 11 && x+y <= 20)
+      // 2) stipsommen t/m 10: a + ... = target (target<=10)
+      case 1: {
+        const p = tryLoop(
+          ()=>({a:r(0,9), target:r(1,10)}),
+          (x)=> x.target > x.a
         );
-        break;
+        a=p.a; target=p.target;
+        miss = target - a;
+        return { html: `${a} + ${dotsPlaceholder()} = ${target}<br><small>Wat moet erbij?</small>`, answer: miss };
+      }
 
-      // 3) t/m 20 met overschrijding tiental (8+5)
-      // beide < 10, som 11..20
-      case 2:
-        [a,b] = tryLoop(
-          ()=>[r(1,9), r(1,9)],
-          (x,y)=> (x+y >= 11 && x+y <= 20)
+      // 3) tussen 10 en 20
+      case 2: {
+        const p = tryLoop(
+          ()=>({a:r(10,19), b:r(1,10)}),
+          (x)=> x.a+x.b >= 11 && x.a+x.b <= 20
         );
-        break;
+        a=p.a; b=p.b;
+        return { html: `${a} + ${b} = ?`, answer: a+b };
+      }
 
-      // 4) t/m 100 – tientallen (40+20)
-      case 3:
-        [a,b] = tryLoop(
-          ()=>[r(1,9)*10, r(1,9)*10],
-          (x,y)=> (x+y <= 100)
-        );
-        break;
+      // 4) vriendjes van 10: a + ... = 10
+      case 3: {
+        a = r(1,9);
+        miss = 10 - a;
+        return { html: `${a} + ${dotsPlaceholder()} = 10<br><small>Vriendjes van 10</small>`, answer: miss };
+      }
 
-      // 5) tientallen optellen bij tiental+eenheid (43+20), totaal <=100
-      case 4:
-        [a,b] = tryLoop(
-          ()=>[r(10,99), r(1,9)*10],
-          (x,y)=> (x%10 !== 0) && (x+y <= 100)
+      // 5) t/m 20 met overschrijding
+      case 4: {
+        const p = tryLoop(
+          ()=>({a:r(1,9), b:r(1,9)}),
+          (x)=> x.a+x.b >= 11 && x.a+x.b <= 20
         );
-        break;
+        a=p.a; b=p.b;
+        return { html: `${a} + ${b} = ?`, answer: a+b };
+      }
 
-      // 6) eenheden bij tiental+eenheid zonder overschrijding (43+3)
-      case 5:
-        [a,b] = tryLoop(
-          ()=>[r(10,99), r(1,9)],
-          (x,y)=> (x%10 !== 0) && ((x%10)+y <= 9) && (x+y <= 100)
+      // 6) stipsommen t/m 20: a + ... = target (target<=20)
+      case 5: {
+        const p = tryLoop(
+          ()=>({a:r(0,19), target:r(1,20)}),
+          (x)=> x.target > x.a
         );
-        break;
+        a=p.a; target=p.target;
+        miss = target - a;
+        return { html: `${a} + ${dotsPlaceholder()} = ${target}<br><small>Wat moet erbij?</small>`, answer: miss };
+      }
 
-      // 7) eenheden bij tiental+eenheid met overschrijding (58+6)
-      case 6:
-        [a,b] = tryLoop(
-          ()=>[r(10,99), r(1,9)],
-          (x,y)=> (x%10 !== 0) && ((x%10)+y >= 10) && (x+y <= 100)
+      // 7) tientallen optellen
+      case 6: {
+        const p = tryLoop(
+          ()=>({a:r(1,9)*10, b:r(1,9)*10}),
+          (x)=> x.a+x.b <= 100
         );
-        break;
+        a=p.a; b=p.b;
+        return { html: `${a} + ${b} = ?`, answer: a+b };
+      }
 
-      // 8) tient+eenh + tient+eenh zonder overschrijding (42+14), totaal <=100
-      case 7:
-        [a,b] = tryLoop(
-          ()=>[r(10,99), r(10,99)],
-          (x,y)=> (x%10 !== 0) && (y%10 !== 0) && ((x%10)+(y%10) <= 9) && (x+y <= 100)
+      // 8) tientallen bij tiental+eenheid
+      case 7: {
+        const p = tryLoop(
+          ()=>({a:r(10,99), b:r(1,9)*10}),
+          (x)=> (x.a%10!==0) && (x.a+x.b<=100)
         );
-        break;
+        a=p.a; b=p.b;
+        return { html: `${a} + ${b} = ?`, answer: a+b };
+      }
 
-      // 9) tient+eenh + tient+eenh met overschrijding (48+24), totaal <=100
-      case 8:
-        [a,b] = tryLoop(
-          ()=>[r(10,99), r(10,99)],
-          (x,y)=> (x%10 !== 0) && (y%10 !== 0) && ((x%10)+(y%10) >= 10) && (x+y <= 100)
+      // 9) eenheden zonder overschrijding
+      case 8: {
+        const p = tryLoop(
+          ()=>({a:r(10,99), b:r(1,9)}),
+          (x)=> (x.a%10!==0) && ((x.a%10)+x.b<=9) && (x.a+x.b<=100)
         );
-        break;
+        a=p.a; b=p.b;
+        return { html: `${a} + ${b} = ?`, answer: a+b };
+      }
+
+      // 10) eenheden met overschrijding
+      case 9: {
+        const p = tryLoop(
+          ()=>({a:r(10,99), b:r(1,9)}),
+          (x)=> (x.a%10!==0) && ((x.a%10)+x.b>=10) && (x.a+x.b<=100)
+        );
+        a=p.a; b=p.b;
+        return { html: `${a} + ${b} = ?`, answer: a+b };
+      }
+
+      // 11) tient+eenh zonder overschrijding
+      case 10: {
+        const p = tryLoop(
+          ()=>({a:r(10,99), b:r(10,99)}),
+          (x)=> (x.a%10!==0) && (x.b%10!==0) && ((x.a%10)+(x.b%10)<=9) && (x.a+x.b<=100)
+        );
+        a=p.a; b=p.b;
+        return { html: `${a} + ${b} = ?`, answer: a+b };
+      }
+
+      // 12) tient+eenh met overschrijding
+      case 11: {
+        const p = tryLoop(
+          ()=>({a:r(10,99), b:r(10,99)}),
+          (x)=> (x.a%10!==0) && (x.b%10!==0) && ((x.a%10)+(x.b%10)>=10) && (x.a+x.b<=100)
+        );
+        a=p.a; b=p.b;
+        return { html: `${a} + ${b} = ?`, answer: a+b };
+      }
     }
-
-    return { a, b, answer: a+b };
   }
 
   function newQ(){
     const i = getLevelIndex();
     const q = makeQuestionForLevel(i);
     correct = q.answer;
-    qEl.textContent = `${q.a} + ${q.b} = ?`;
+    qEl.innerHTML = q.html;
     ansEl.value = "";
     ansEl.focus();
   }
 
-  // ===== Spel =====
   function start(){
     if(active) return;
     active=true; good=0; tries=0; t=SECONDS;
@@ -279,6 +327,7 @@
       msg += ` (Huidig niveau: ${LEVELS[i].name})`;
     }
     resEl.textContent = msg;
+    renderLevel();
   }
 
   ansEl.addEventListener("keydown",(e)=>{
@@ -302,11 +351,10 @@
 
   startBtn.addEventListener("click", start);
 
-  // ===== Init =====
   renderLevel();
   timeEl.textContent = fmt(SECONDS);
 
-  // ===== MOO code (export/import) =====
+  // ===== MOO export/import =====
   const codeEl = document.getElementById("code");
   const msgEl = document.getElementById("msg");
 
