@@ -105,45 +105,10 @@
       cursor:default;
     }
 
-    .panel{
-      margin-top:1.6rem;
-      background:#f7f8ff;
-      border:1px solid #e6e8ff;
-      border-radius:1rem;
-      padding:1rem;
-      text-align:left
-    }
-    .panel-title{
-      font-weight:900;
-      margin-bottom:.25rem;
-    }
-    .smalltxt{
-      font-size:.85rem;
-      color:#666;
-      line-height:1.35;
-    }
-    .btnrow{
-      display:flex;
-      gap:.6rem;
-      flex-wrap:wrap;
-      margin-top:.7rem;
-      align-items:center;
-    }
-    #code{
-      font-size:1rem;
-      padding:.6rem .85rem;
-      border-radius:.9rem;
-      border:2px solid #cfcfe6;
-      outline:none;
-      flex:1;
-      min-width:260px;
-      background:#fff;
-    }
-    #msg{
-      margin-top:.4rem;
+    .note{
+      margin-top:1.2rem;
       font-size:.9rem;
-      color:#333;
-      font-weight:700;
+      color:#666;
     }
   </style>
 </head>
@@ -156,7 +121,7 @@
     </div>
 
     <h1>Keersommen</h1>
-    <div class="levelbar" id="level">Niveau: -</div>
+    <div class="levelbar" id="level">Niveau: laden…</div>
 
     <div class="stats">
       ⏱ <span id="time">2:00</span> |
@@ -168,29 +133,70 @@
     <input id="answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="antwoord" disabled>
     <div class="feedback" id="feedback"></div>
 
-    <button id="startBtn">Start</button>
+    <button id="startBtn" disabled>Start</button>
 
-    <!-- Code laden / maken -->
-    <div class="panel">
-      <div class="panel-title">Code voor MOO (niveau meenemen)</div>
-      <div class="smalltxt">
-        Klik <b>Maak code</b>, kopieer/plak in MOO. Op een andere Chromebook: plak en klik <b>Laad code</b>.
-        (De code is leerling-specifiek.)
-      </div>
-
-      <div class="btnrow">
-        <button id="makeBtn">Maak code</button>
-        <button id="loadBtn" class="secondary">Laad code</button>
-        <input id="code" placeholder="Plak hier je code…">
-      </div>
-
-      <div id="msg"></div>
-    </div>
+    <div class="note" id="statusNote">Niveau wordt centraal geladen…</div>
   </div>
 
 <script>
 /* =========================
-   1) Leerling + opslag
+   0) GOOGLE SHEETS (JSONP)
+========================= */
+https://script.google.com/macros/s/AKfycbz1CoVtmg3brs0r_G3mRvznGWG0utgi4AYrW-eDFkoCx2pwhZeCVetqDj4pf-Gtih6WMw/exec
+function sheetsJSONP(params){
+  return new Promise((resolve, reject) => {
+    const cb = "cb_" + Math.random().toString(36).slice(2);
+    params.callback = cb;
+    const qs = new URLSearchParams(params).toString();
+    const s = document.createElement("script");
+    s.src = SHEETS_API + "?" + qs;
+
+    window[cb] = (data) => {
+      delete window[cb];
+      s.remove();
+      resolve(data);
+    };
+
+    s.onerror = () => {
+      delete window[cb];
+      s.remove();
+      reject(new Error("Sheets JSONP load error"));
+    };
+
+    document.head.appendChild(s);
+  });
+}
+
+async function loadLevelsFromSheets(studentId){
+  const res = await sheetsJSONP({ action:"get", code: studentId });
+  if(res && res.ok && res.found){
+    return {
+      plus: Number(res.plus ?? 0),
+      min:  Number(res.min  ?? 0),
+      keer: Number(res.keer ?? 0),
+      deel: Number(res.deel ?? 0),
+      naam: res.naam ?? studentId
+    };
+  }
+  return { plus:0, min:0, keer:0, deel:0, naam: studentId };
+}
+
+async function saveLevelsToSheets(studentId, levels){
+  // levels = { plus, min, keer, deel, naam? }
+  const res = await sheetsJSONP({
+    action:"set",
+    code: studentId,
+    naam: (levels.naam ?? studentId),
+    plus: levels.plus ?? 0,
+    min:  levels.min  ?? 0,
+    keer: levels.keer ?? 0,
+    deel: levels.deel ?? 0
+  });
+  return res;
+}
+
+/* =========================
+   1) Leerling + lokale fallback
 ========================= */
 const CURRENT = "rekenen_current_student_v1";
 const DATA_PREFIX = "rekenen_data_v1_";
@@ -201,10 +207,11 @@ if(!studentId){
 }
 
 document.getElementById("who").textContent = `Leerling: ${studentId}`;
+const statusNote = document.getElementById("statusNote");
 
 function dataKey(){ return DATA_PREFIX + studentId; }
 
-function getData(){
+function getLocalData(){
   return JSON.parse(localStorage.getItem(dataKey())) || {
     v: 1,
     id: studentId,
@@ -212,7 +219,7 @@ function getData(){
   };
 }
 
-function saveData(d){
+function saveLocalData(d){
   localStorage.setItem(dataKey(), JSON.stringify(d));
 }
 
@@ -233,25 +240,30 @@ const LEVELS = [
   "Grote keersommen (80×9, 800×9, 80×90)"
 ];
 
-// hoeveel goed voor level-up
 const PROMOTE_AT = 24;
 
-// netjes: level ophalen en clampen
-function getLevel(){
-  const d = getData();
-  const lvl = d.levels?.keer ?? 0;
-  return Math.max(0, Math.min(lvl, LEVELS.length - 1));
+let levels = { plus:0, min:0, keer:0, deel:0, naam: studentId };
+
+function clampLevel(lvl){
+  return Math.max(0, Math.min(Number(lvl)||0, LEVELS.length-1));
 }
 
-function setLevel(lvl){
-  const d = getData();
+function getKeerLevel(){
+  return clampLevel(levels.keer);
+}
+
+function setKeerLevel(lvl){
+  levels.keer = clampLevel(lvl);
+
+  // lokale backup opslaan
+  const d = getLocalData();
   d.levels = d.levels || { plus:0, min:0, keer:0, deel:0 };
-  d.levels.keer = Math.max(0, Math.min(lvl, LEVELS.length - 1));
-  saveData(d);
+  d.levels.keer = levels.keer;
+  saveLocalData(d);
 }
 
 function renderLevel(){
-  document.getElementById("level").textContent = "Niveau: " + LEVELS[getLevel()];
+  document.getElementById("level").textContent = "Niveau: " + LEVELS[getKeerLevel()];
 }
 
 /* =========================
@@ -300,7 +312,7 @@ function clearFeedback(){
    5) Vraag generatie
 ========================= */
 function makeQuestion(){
-  const lvl = getLevel();
+  const lvl = getKeerLevel();
 
   // Niveau 10: stipsommen: a × ... = product
   if(lvl === 9){
@@ -398,7 +410,7 @@ function startRun(){
   makeQuestion();
 
   if(timer) clearInterval(timer);
-  timer=setInterval(()=>{
+  timer=setInterval(async ()=>{
     time--;
     fmtTime();
 
@@ -410,11 +422,23 @@ function startRun(){
       startBtn.disabled=false;
 
       // level-up check
-      const lvl = getLevel();
+      const lvl = getKeerLevel();
+      let changed = false;
+
       if(good >= PROMOTE_AT && lvl < LEVELS.length-1){
-        setLevel(lvl+1);
+        setKeerLevel(lvl+1);
         renderLevel();
+        changed = true;
         alert("🎉 Niveau omhoog!");
+      }
+
+      // altijd even opslaan naar Sheets (zeker als level veranderd is)
+      try{
+        statusNote.textContent = "Opslaan…";
+        await saveLevelsToSheets(studentId, levels);
+        statusNote.textContent = changed ? "Niveau opgeslagen (centraal) ✅" : "Resultaat opgeslagen ✅";
+      }catch(e){
+        statusNote.textContent = "Opslaan naar Sheets lukt niet (tijdelijk).";
       }
     }
   }, 1000);
@@ -426,7 +450,6 @@ function startRun(){
 function submitAnswer(){
   if(!running) return;
 
-  // alleen cijfers
   const raw = aEl.value.trim().replace(/[^0-9]/g,"");
   if(raw==="") return;
 
@@ -447,74 +470,50 @@ function submitAnswer(){
   aEl.focus();
 }
 
-// Enter = check
 aEl.addEventListener("keydown",(e)=>{
   if(e.key==="Enter") submitAnswer();
 });
 
 /* =========================
-   8) Code maken / laden
-   (zelfde stijl als bij delen)
+   8) Init: levels laden uit Sheets
 ========================= */
-const codeEl = document.getElementById("code");
-const msgEl = document.getElementById("msg");
+async function init(){
+  fmtTime();
 
-function checksum(str){
-  let h=0;
-  for(let i=0;i<str.length;i++) h=(h*31 + str.charCodeAt(i))>>>0;
-  return h.toString(36);
-}
-function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
-function b64decode(str){ return decodeURIComponent(escape(atob(str))); }
-
-document.getElementById("makeBtn").addEventListener("click", ()=>{
-  const d = getData();
-  const payload = { v:1, id:d.id, levels:d.levels };
-  const json = JSON.stringify(payload);
-  const packed = b64encode(json) + "." + checksum(json);
-
-  codeEl.value = packed;
-  codeEl.select();
-  try{ document.execCommand("copy"); }catch(e){}
-  msgEl.textContent = "✅ Code gemaakt (vaak al gekopieerd). Plak in MOO.";
-});
-
-document.getElementById("loadBtn").addEventListener("click", ()=>{
-  const raw = (codeEl.value||"").trim();
-  if(!raw){ msgEl.textContent="Plak eerst een code."; return; }
-
-  const parts = raw.split(".");
-  if(parts.length!==2){ msgEl.textContent="Code klopt niet (formaat)."; return; }
+  // fallback: laad wat je lokaal had (voor het geval Sheets even faalt)
+  const local = getLocalData();
+  if(local?.levels){
+    levels.plus = local.levels.plus ?? 0;
+    levels.min  = local.levels.min  ?? 0;
+    levels.keer = local.levels.keer ?? 0;
+    levels.deel = local.levels.deel ?? 0;
+  }
 
   try{
-    const json = b64decode(parts[0]);
-    if(checksum(json)!==parts[1]){ msgEl.textContent="Code klopt niet (controle)."; return; }
+    statusNote.textContent = "Niveau laden…";
+    const remote = await loadLevelsFromSheets(studentId);
+    levels = { ...levels, ...remote };
 
-    const payload = JSON.parse(json);
-    if(!payload || payload.v!==1 || payload.id!==studentId || !payload.levels){
-      msgEl.textContent="Deze code is niet voor deze leerling.";
-      return;
-    }
-
-    // levels samenvoegen
-    const d = getData();
+    // lokale backup bijwerken
+    const d = getLocalData();
     d.levels = d.levels || { plus:0, min:0, keer:0, deel:0 };
-    d.levels = { ...d.levels, ...payload.levels };
-    saveData(d);
+    d.levels.plus = levels.plus ?? 0;
+    d.levels.min  = levels.min  ?? 0;
+    d.levels.keer = levels.keer ?? 0;
+    d.levels.deel = levels.deel ?? 0;
+    saveLocalData(d);
 
-    renderLevel();
-    msgEl.textContent="✅ Code geladen!";
+    statusNote.textContent = "Niveau geladen (centraal) ✅";
   }catch(e){
-    msgEl.textContent="Kon code niet lezen.";
+    statusNote.textContent = "Kon niveau niet laden uit Sheets (lokale backup gebruikt).";
   }
-});
 
-/* =========================
-   9) Startknop + init
-========================= */
-startBtn.addEventListener("click", startRun);
-renderLevel();
-fmtTime();
+  renderLevel();
+  startBtn.disabled = false;
+}
+
+document.getElementById("startBtn").addEventListener("click", startRun);
+init();
 </script>
 </body>
 </html>
