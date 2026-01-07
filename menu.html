@@ -2,42 +2,277 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8" />
-  <title>Menu – Rekenoefeningen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Rekenen – Menu</title>
   <style>
     body{font-family:system-ui,sans-serif;background:#f4f6ff;margin:0;min-height:100vh;display:flex;justify-content:center;align-items:center}
-    .box{background:#fff;padding:2.2rem 2.4rem;border-radius:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.1);max-width:640px;width:95%;text-align:center}
-    h1{margin:0 0 .6rem}
-    .sub{color:#555;margin:0 0 1.2rem}
-    .btn{display:block;margin:.7rem 0;padding:1rem 1.2rem;border-radius:999px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:900}
-    .btn.secondary{background:#6366f1}
-    .btn.accent{background:#16a34a}
-    .btn.dark{background:#0f172a}
-    .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
-    a.small{color:#4f46e5;text-decoration:none;font-weight:800}
+    .box{background:#fff;padding:2rem 2.2rem;border-radius:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.1);max-width:900px;width:95%}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+    h1{margin:.2rem 0;font-size:2rem}
     .pill{display:inline-block;padding:.35rem .7rem;border-radius:999px;background:#eef2ff;font-weight:900}
+    .status{font-size:.9rem;color:#555;margin-top:.15rem}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1.2rem}
+    .card{background:#f7f8ff;border:1px solid #e6e8ff;border-radius:1.2rem;padding:1rem}
+    .card h2{margin:.1rem 0 .4rem;font-size:1.2rem}
+    .lvl{font-weight:900;margin:.25rem 0 .7rem;color:#111}
+    .btn{display:inline-block;border:none;border-radius:999px;padding:.75rem 1rem;font-weight:900;cursor:pointer;text-decoration:none;text-align:center}
+    .primary{background:#4f46e5;color:#fff}
+    .dark{background:#0f172a;color:#fff}
+    .ghost{background:#eef2ff;color:#111}
+    .row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem;align-items:center}
+    .small{font-size:.85rem;color:#666;line-height:1.35}
+    input{font-size:1rem;padding:.6rem .8rem;border-radius:.9rem;border:2px solid #cfcfe6;outline:none}
+    input:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+    .sep{height:1px;background:#ececff;margin:1.2rem 0}
+    a.link{color:#4f46e5;font-weight:900;text-decoration:none}
   </style>
 </head>
 <body>
   <div class="box">
     <div class="top">
-      <a class="small" href="index.html">← Andere leerling</a>
+      <div>
+        <h1>Rekenen – menu</h1>
+        <div class="status" id="sheetStatus">Sheets: verbinden…</div>
+      </div>
       <div class="pill" id="who">Leerling: —</div>
     </div>
 
-    <h1>Kies wat je oefent</h1>
+    <div class="grid">
+      <div class="card">
+        <h2>Optellen</h2>
+        <div class="lvl" id="lvlPlus">Niveau: laden…</div>
+        <a class="btn primary" href="plus.html">Start optellen</a>
+      </div>
 
-    <a class="btn" href="plus.html">Optellen</a>
-  <a class="btn secondary" href="min.html">Aftrekken</a>
-<a class="btn accent" href="keer.html">Keer</a>
-<a class="btn dark" href="deel.html">Delen</a>
+      <div class="card">
+        <h2>Aftrekken</h2>
+        <div class="lvl" id="lvlMin">Niveau: laden…</div>
+        <a class="btn primary" href="min.html">Start aftrekken</a>
+      </div>
+
+      <div class="card">
+        <h2>Keer</h2>
+        <div class="lvl" id="lvlKeer">Niveau: laden…</div>
+        <a class="btn primary" href="keer.html">Start keersommen</a>
+      </div>
+
+      <div class="card">
+        <h2>Delen</h2>
+        <div class="lvl" id="lvlDeel">Niveau: laden…</div>
+        <a class="btn primary" href="deel.html">Start deelsommen</a>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="row">
+      <button class="btn ghost" id="reloadBtn">Herlaad uit Sheets</button>
+      <button class="btn dark" id="clearCacheBtn">Wis lokale cache</button>
+      <a class="link" href="index.html">Andere leerling kiezen</a>
+    </div>
+
+    <div class="small" style="margin-top:.6rem">
+      Tip bij “incognito werkt wel”: klik <b>Wis lokale cache</b> en daarna <b>Herlaad uit Sheets</b>.
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="card">
+      <h2>Leerkracht (optioneel)</h2>
+      <div class="small">
+        Hiermee kun je levels van <b>deze leerling</b> terugzetten naar 0 in Sheets.
+        Handig als je iets wilt resetten. Zet hieronder een pincode in de code.
+      </div>
+
+      <div class="row" style="margin-top:.8rem">
+        <input id="teacherPin" type="password" placeholder="Pincode" />
+        <button class="btn dark" id="resetSheetsBtn">Reset levels in Sheets</button>
+      </div>
+      <div class="small" id="teacherMsg" style="margin-top:.5rem"></div>
+    </div>
 
   </div>
 
 <script>
-  const STORAGE_CURRENT = "rekenen_current_student_v1";
-  const id = localStorage.getItem(STORAGE_CURRENT) || "";
-  document.getElementById("who").textContent = id ? `Leerling: ${id}` : "Leerling: —";
-  if(!id){ location.href = "index.html"; }
+/* =========================
+   A) CONFIG
+========================= */
+const SHEETS_EXEC_URL = "https://script.google.com/macros/s/AKfycbzwJm59S4rcRcLyvzxslTocnBSYv7KnOinPn72X9ji43CkQhDwjyY8gfjE7YnP-zYUBTQ/exec";
+
+// Kies zelf een pincode (alleen voor reset-knop)
+// Zet dit bv op "1234" of laat leeg "" om reset uit te zetten.
+const TEACHER_PIN = "1234";
+
+/* =========================
+   B) leerling
+========================= */
+const STORAGE_CURRENT = "rekenen_current_student_v1";
+const studentId = (localStorage.getItem(STORAGE_CURRENT) || "").trim();
+if(!studentId) location.href = "index.html";
+document.getElementById("who").textContent = `Leerling: ${studentId}`;
+
+/* =========================
+   C) Local fallback / cache
+========================= */
+const STORAGE_DATA_PREFIX = "rekenen_data_v1_";
+function dataKey(){ return STORAGE_DATA_PREFIX + studentId; }
+function getLocalData(){
+  const raw = localStorage.getItem(dataKey());
+  return raw ? JSON.parse(raw) : { v:1, id:studentId, levels:{plus:0,min:0,keer:0,deel:0} };
+}
+function setLocalData(d){ localStorage.setItem(dataKey(), JSON.stringify(d)); }
+
+/* =========================
+   D) JSONP helper
+========================= */
+let __jsonpSeq = 0;
+function jsonp(url){
+  return new Promise((resolve, reject) => {
+    const cb = "__cb_" + (++__jsonpSeq) + "_" + Date.now();
+    const script = document.createElement("script");
+
+    const cleanup = () => { delete window[cb]; script.remove(); };
+    window[cb] = (data) => { cleanup(); resolve(data); };
+    script.onerror = () => { cleanup(); reject(new Error("JSONP failed")); };
+
+    const sep = url.includes("?") ? "&" : "?";
+    script.src = url + sep + "callback=" + encodeURIComponent(cb);
+    document.body.appendChild(script);
+  });
+}
+
+async function sheetsGet(leerling){
+  const url = `${SHEETS_EXEC_URL}?action=get&leerling=${encodeURIComponent(leerling)}`;
+  return await jsonp(url);
+}
+
+async function sheetsSet(leerling, levels){
+  const url =
+    `${SHEETS_EXEC_URL}?action=set&leerling=${encodeURIComponent(leerling)}`
+    + `&plus=${encodeURIComponent(levels.plus)}`
+    + `&min=${encodeURIComponent(levels.min)}`
+    + `&keer=${encodeURIComponent(levels.keer)}`
+    + `&deel=${encodeURIComponent(levels.deel)}`;
+  return await jsonp(url);
+}
+
+/* =========================
+   E) Level namen (voor in menu)
+========================= */
+const PLUS_NAMES = [
+  "t/m 10","stipsommen t/m 10","10–20 (14+3)","vriendjes van 10","t/m 20 overschrijding",
+  "stipsommen t/m 20","t/m 100 tientallen","43+20","43+3","58+6","42+14","48+24"
+];
+const MIN_NAMES = [
+  "t/m 10","stipsommen t/m 10","10–20 (14-3)","vriendjes van 10","t/m 20 overschrijding",
+  "stipsommen t/m 20","t/m 100 tientallen","43-20","46-3","54-6","48-14","42-24"
+];
+const KEER_NAMES = [
+  "tafel 2","tafel 2 & 10","2/5/10","3 & 4","2/3/4/5/10","6 & 7","2/3/4/5/6/7/10","8 & 9",
+  "alle tafels","stipsommen","grote keersommen"
+];
+const DEEL_NAMES = [
+  "deel 2","2 & 10","2/5/10","3 & 4","2/3/4/5/10","6 & 7","2/3/4/5/6/7/10","8 & 9",
+  "alle deeltafels","stipsommen","grotere deelsommen","t/m 100 (≤20)"
+];
+
+function clamp(n, max){
+  n = Number(n) || 0;
+  if(n < 0) n = 0;
+  if(n > max) n = max;
+  return n;
+}
+
+function render(levels){
+  const p = clamp(levels.plus, PLUS_NAMES.length-1);
+  const m = clamp(levels.min,  MIN_NAMES.length-1);
+  const k = clamp(levels.keer, KEER_NAMES.length-1);
+  const d = clamp(levels.deel, DEEL_NAMES.length-1);
+
+  document.getElementById("lvlPlus").textContent = `Niveau ${p+1}: ${PLUS_NAMES[p]}`;
+  document.getElementById("lvlMin").textContent  = `Niveau ${m+1}: ${MIN_NAMES[m]}`;
+  document.getElementById("lvlKeer").textContent = `Niveau ${k+1}: ${KEER_NAMES[k]}`;
+  document.getElementById("lvlDeel").textContent = `Niveau ${d+1}: ${DEEL_NAMES[d]}`;
+}
+
+/* =========================
+   F) INIT + knoppen
+========================= */
+let sheetsOk = false;
+let levels = {plus:0,min:0,keer:0,deel:0};
+
+async function loadFromSheets(){
+  const status = document.getElementById("sheetStatus");
+  status.textContent = "Sheets: laden…";
+  try{
+    const res = await sheetsGet(studentId);
+    if(res && res.ok === true && res.levels){
+      levels = {
+        plus: Number(res.levels.plus) || 0,
+        min:  Number(res.levels.min)  || 0,
+        keer: Number(res.levels.keer) || 0,
+        deel: Number(res.levels.deel) || 0
+      };
+      sheetsOk = true;
+      status.textContent = "Sheets: verbonden ✅";
+      render(levels);
+      return;
+    }
+    throw new Error("Unexpected response");
+  }catch(e){
+    // fallback lokaal
+    const d = getLocalData();
+    levels = {
+      plus: Number(d.levels?.plus) || 0,
+      min:  Number(d.levels?.min)  || 0,
+      keer: Number(d.levels?.keer) || 0,
+      deel: Number(d.levels?.deel) || 0
+    };
+    sheetsOk = false;
+    status.textContent = "Sheets: niet bereikbaar (lokale backup gebruikt).";
+    render(levels);
+  }
+}
+
+document.getElementById("reloadBtn").addEventListener("click", loadFromSheets);
+
+document.getElementById("clearCacheBtn").addEventListener("click", () => {
+  // Wis alleen deze leerling z’n lokale cache
+  localStorage.removeItem(dataKey());
+  alert("Lokale cache gewist voor deze leerling.\nKlik nu op 'Herlaad uit Sheets'.");
+});
+
+document.getElementById("resetSheetsBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("teacherMsg");
+
+  if(!TEACHER_PIN){
+    msg.textContent = "Reset is uitgezet in de code (TEACHER_PIN is leeg).";
+    return;
+  }
+
+  const pin = (document.getElementById("teacherPin").value || "").trim();
+  if(pin !== TEACHER_PIN){
+    msg.textContent = "Pincode klopt niet.";
+    return;
+  }
+
+  if(!confirm(`Weet je zeker dat je de levels van "${studentId}" in Sheets wilt resetten naar 0?`)){
+    msg.textContent = "Reset geannuleerd.";
+    return;
+  }
+
+  msg.textContent = "Resetten in Sheets…";
+  try{
+    await sheetsSet(studentId, {plus:0,min:0,keer:0,deel:0});
+    msg.textContent = "Reset gelukt ✅";
+    await loadFromSheets();
+  }catch(e){
+    msg.textContent = "Reset mislukt ⚠️";
+  }
+});
+
+// init
+loadFromSheets();
 </script>
 </body>
 </html>
