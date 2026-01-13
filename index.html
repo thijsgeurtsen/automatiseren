@@ -24,15 +24,8 @@
       width:100%;
       text-align:center;
     }
-    h1{
-      margin:0 0 .4rem;
-      font-size:2.4rem;
-    }
-    .sub{
-      margin:0 0 1.6rem;
-      color:#555;
-      font-size:1.1rem;
-    }
+    h1{margin:0 0 .4rem;font-size:2.4rem;}
+    .sub{margin:0 0 1.6rem;color:#555;font-size:1.1rem;}
     input{
       width:100%;
       font-size:1.4rem;
@@ -57,10 +50,7 @@
       font-size:1.2rem;
       cursor:pointer;
     }
-    button:disabled{
-      background:#b9b9c7;
-      cursor:default;
-    }
+    button:disabled{background:#b9b9c7;cursor:default;}
   </style>
 </head>
 
@@ -80,14 +70,21 @@
   const nameEl = document.getElementById("name");
   const goBtn  = document.getElementById("go");
 
-  nameEl.focus();
+  function normalizeName(s){
+    // trim, lowercase, meerdere spaties -> 1, en alleen letters/cijfers/spatie/koppelteken
+    return (s || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[^a-z0-9 \-]/g, "");
+  }
 
   function update(){
-    goBtn.disabled = !nameEl.value.trim();
+    goBtn.disabled = !normalizeName(nameEl.value);
   }
 
   function go(){
-    const name = nameEl.value.trim().toLowerCase();
+    const name = normalizeName(nameEl.value);
     if(!name) return;
     localStorage.setItem(STORAGE_CURRENT, name);
     location.href = "menu.html";
@@ -98,6 +95,10 @@
     if(e.key === "Enter") go();
   });
   goBtn.addEventListener("click", go);
+
+  // init
+  nameEl.focus();
+  update();
 </script>
 </body>
 </html>
