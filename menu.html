@@ -18,7 +18,6 @@
     .btn{display:inline-block;border:none;border-radius:999px;padding:.75rem 1rem;font-weight:900;cursor:pointer;text-decoration:none;text-align:center}
     .primary{background:#4f46e5;color:#fff}
     .dark{background:#0f172a;color:#fff}
-    .ghost{background:#eef2ff;color:#111}
     .row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem;align-items:center}
     .small{font-size:.85rem;color:#666;line-height:1.35}
     input{font-size:1rem;padding:.6rem .8rem;border-radius:.9rem;border:2px solid #cfcfe6;outline:none}
@@ -65,10 +64,9 @@
 
     <div class="sep"></div>
 
-<div class="row">
-  <a class="link" href="index.html">Andere leerling kiezen</a>
-</div>
-
+    <div class="row">
+      <a class="link" href="index.html">Andere leerling kiezen</a>
+    </div>
 
     <div class="sep"></div>
 
@@ -76,7 +74,6 @@
       <h2>Leerkracht (optioneel)</h2>
       <div class="small">
         Hiermee kun je levels van <b>deze leerling</b> terugzetten naar 0 in Sheets.
-        Handig als je iets wilt resetten. Zet hieronder een pincode in de code.
       </div>
 
       <div class="row" style="margin-top:.8rem">
@@ -85,7 +82,6 @@
       </div>
       <div class="small" id="teacherMsg" style="margin-top:.5rem"></div>
     </div>
-
   </div>
 
 <script>
@@ -94,12 +90,11 @@
 ========================= */
 const SHEETS_EXEC_URL = "https://script.google.com/macros/s/AKfycbzwJm59S4rcRcLyvzxslTocnBSYv7KnOinPn72X9ji43CkQhDwjyY8gfjE7YnP-zYUBTQ/exec";
 
-// Kies zelf een pincode (alleen voor reset-knop)
-// Zet dit bv op "1234" of laat leeg "" om reset uit te zetten.
+// Kies een pincode voor reset (laat leeg "" om reset helemaal uit te zetten)
 const TEACHER_PIN = "1234";
 
 /* =========================
-   B) leerling
+   B) Leerling
 ========================= */
 const STORAGE_CURRENT = "rekenen_current_student_v1";
 const studentId = (localStorage.getItem(STORAGE_CURRENT) || "").trim();
@@ -107,7 +102,7 @@ if(!studentId) location.href = "index.html";
 document.getElementById("who").textContent = `Leerling: ${studentId}`;
 
 /* =========================
-   C) Local fallback / cache
+   C) Local fallback (backup)
 ========================= */
 const STORAGE_DATA_PREFIX = "rekenen_data_v1_";
 function dataKey(){ return STORAGE_DATA_PREFIX + studentId; }
@@ -115,10 +110,12 @@ function getLocalData(){
   const raw = localStorage.getItem(dataKey());
   return raw ? JSON.parse(raw) : { v:1, id:studentId, levels:{plus:0,min:0,keer:0,deel:0} };
 }
-function setLocalData(d){ localStorage.setItem(dataKey(), JSON.stringify(d)); }
+function setLocalData(d){
+  localStorage.setItem(dataKey(), JSON.stringify(d));
+}
 
 /* =========================
-   D) JSONP helper
+   D) JSONP helper (CORS-proof)
 ========================= */
 let __jsonpSeq = 0;
 function jsonp(url){
@@ -126,7 +123,7 @@ function jsonp(url){
     const cb = "__cb_" + (++__jsonpSeq) + "_" + Date.now();
     const script = document.createElement("script");
 
-    const cleanup = () => { delete window[cb]; script.remove(); };
+    const cleanup = () => { try{ delete window[cb]; }catch(e){} script.remove(); };
     window[cb] = (data) => { cleanup(); resolve(data); };
     script.onerror = () => { cleanup(); reject(new Error("JSONP failed")); };
 
@@ -152,7 +149,7 @@ async function sheetsSet(leerling, levels){
 }
 
 /* =========================
-   E) Level namen (voor in menu)
+   E) Level namen (menu)
 ========================= */
 const PLUS_NAMES = [
   "t/m 10","stipsommen t/m 10","10–20 (14+3)","vriendjes van 10","t/m 20 overschrijding",
@@ -191,16 +188,17 @@ function render(levels){
 }
 
 /* =========================
-   F) INIT + knoppen
+   F) Load levels
 ========================= */
-let sheetsOk = false;
 let levels = {plus:0,min:0,keer:0,deel:0};
 
 async function loadFromSheets(){
   const status = document.getElementById("sheetStatus");
   status.textContent = "Sheets: laden…";
+
   try{
     const res = await sheetsGet(studentId);
+
     if(res && res.ok === true && res.levels){
       levels = {
         plus: Number(res.levels.plus) || 0,
@@ -208,14 +206,20 @@ async function loadFromSheets(){
         keer: Number(res.levels.keer) || 0,
         deel: Number(res.levels.deel) || 0
       };
-      sheetsOk = true;
+
+      // update lokale backup meteen (handig bij netwerkproblemen)
+      const local = getLocalData();
+      local.levels = {...local.levels, ...levels};
+      setLocalData(local);
+
       status.textContent = "Sheets: verbonden ✅";
       render(levels);
       return;
     }
+
     throw new Error("Unexpected response");
   }catch(e){
-    // fallback lokaal
+    // fallback: lokaal
     const d = getLocalData();
     levels = {
       plus: Number(d.levels?.plus) || 0,
@@ -223,25 +227,19 @@ async function loadFromSheets(){
       keer: Number(d.levels?.keer) || 0,
       deel: Number(d.levels?.deel) || 0
     };
-    sheetsOk = false;
     status.textContent = "Sheets: niet bereikbaar (lokale backup gebruikt).";
     render(levels);
   }
 }
 
-document.getElementById("reloadBtn").addEventListener("click", loadFromSheets);
-
-document.getElementById("clearCacheBtn").addEventListener("click", () => {
-  // Wis alleen deze leerling z’n lokale cache
-  localStorage.removeItem(dataKey());
-  alert("Lokale cache gewist voor deze leerling.\nKlik nu op 'Herlaad uit Sheets'.");
-});
-
+/* =========================
+   G) Teacher reset
+========================= */
 document.getElementById("resetSheetsBtn").addEventListener("click", async () => {
   const msg = document.getElementById("teacherMsg");
 
   if(!TEACHER_PIN){
-    msg.textContent = "Reset is uitgezet in de code (TEACHER_PIN is leeg).";
+    msg.textContent = "Reset is uitgezet (TEACHER_PIN is leeg).";
     return;
   }
 
